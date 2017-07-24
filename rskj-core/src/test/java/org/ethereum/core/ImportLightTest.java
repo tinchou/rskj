@@ -50,7 +50,7 @@ public class ImportLightTest {
     public static void setup() {
         SystemProperties.CONFIG.setBlockchainConfig(new GenesisConfig(new GenesisConfig.GenesisConstants() {
             @Override
-            public BigInteger getMINIMUM_DIFFICULTY() {
+            public BigInteger getMinimumDifficulty() {
                 return BigInteger.ONE;
             }
         }));
@@ -63,7 +63,7 @@ public class ImportLightTest {
 
     public static BlockChainImpl createBlockchain(Genesis genesis) {
         IndexedBlockStore blockStore = new IndexedBlockStore();
-        blockStore.init(new HashMap<>(), new HashMapDB(), null, null);
+        blockStore.init(new HashMap<>(), new HashMapDB(), null);
 
         Repository repository = new RepositoryImpl(new TrieStoreImpl(new HashMapDB()));
 

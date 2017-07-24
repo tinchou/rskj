@@ -22,7 +22,6 @@ package org.ethereum.net;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import co.rsk.panic.PanicProcessor;
-import org.ethereum.listener.EthereumListener;
 import org.ethereum.net.eth.message.EthMessage;
 import org.ethereum.net.message.Message;
 import org.ethereum.net.message.ReasonCode;
@@ -31,7 +30,6 @@ import org.ethereum.net.p2p.PingMessage;
 import org.ethereum.net.server.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
@@ -71,12 +69,10 @@ public class MessageQueue {
         }
     });
 
-    private Queue<MessageRoundtrip> requestQueue = new ConcurrentLinkedQueue<>();
-    private Queue<MessageRoundtrip> respondQueue = new ConcurrentLinkedQueue<>();
+    private Queue<MessageRoundtrip> requestQueue = new LinkedBlockingQueue<>();
+    private Queue<MessageRoundtrip> respondQueue = new LinkedBlockingQueue<>();
     private ChannelHandlerContext ctx = null;
 
-    @Autowired
-    EthereumListener ethereumListener;
     boolean hasPing = false;
     private ScheduledFuture<?> timerTask;
     private Channel channel;
@@ -104,7 +100,9 @@ public class MessageQueue {
 
     public void sendMessage(Message msg) {
         if (msg instanceof PingMessage) {
-            if (hasPing) return;
+            if (hasPing) {
+                return;
+            }
             logger.trace("Sending Ping Message to {}", channel);
             hasPing = true;
         }
@@ -130,13 +128,13 @@ public class MessageQueue {
 
     public void receivedMessage(Message msg) throws InterruptedException {
 
-        ethereumListener.trace("[Recv: " + msg + "]");
-
         MessageRoundtrip messageRoundtrip = requestQueue.peek();
         if (messageRoundtrip != null) {
             Message waitingMessage = messageRoundtrip.getMsg();
 
-            if (waitingMessage instanceof PingMessage) hasPing = false;
+            if (waitingMessage instanceof PingMessage) {
+                hasPing = false;
+            }
 
             if (waitingMessage.getAnswerMessage() != null
                     && msg.getClass() == waitingMessage.getAnswerMessage()) {
@@ -168,8 +166,6 @@ public class MessageQueue {
             // TODO: retry logic. See messageRoundtrip.hasToRetry
 
             Message msg = messageRoundtrip.getMsg();
-
-            ethereumListener.onSendMessage(channel, msg);
 
             ctx.writeAndFlush(msg).addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
 

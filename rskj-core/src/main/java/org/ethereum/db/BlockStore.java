@@ -62,8 +62,6 @@ public interface BlockStore {
 
     BigInteger getTotalDifficultyForHash(byte[] hash);
 
-    BigInteger getTotalDifficulty();
-
     Block getBestBlock();
 
     long getMaxNumber();
@@ -74,4 +72,5 @@ public interface BlockStore {
 
     void load();
 
+    List<BlockInformation> getBlocksInformationByNumber(long number);
 }

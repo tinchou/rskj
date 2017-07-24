@@ -18,6 +18,7 @@
 
 package co.rsk.net;
 
+import co.rsk.config.RskSystemProperties;
 import co.rsk.core.bc.BlockUtils;
 import co.rsk.net.messages.*;
 import org.ethereum.core.Block;
@@ -60,15 +61,17 @@ public class NodeBlockProcessor implements BlockProcessor {
     @GuardedBy("statusLock")
     private volatile long lastStatusBestBlock = 0;
 
-    final private BlockStore store;
-    final private Blockchain blockchain;
-    final private ChannelManager channelManager;
-    final private BlockNodeInformation nodeInformation; // keep tabs on which nodes know which blocks.
+    private final BlockStore store;
+    private final Blockchain blockchain;
+    private final ChannelManager channelManager;
+    private final BlockNodeInformation nodeInformation; // keep tabs on which nodes know which blocks.
     private long lastKnownBlockNumber = 0;
 
     private Map<ByteArrayWrapper, Integer> unknownBlockHashes = new HashMap<>();
 
     private long lastStatusTime;
+    private long blocksForPeers;
+    private boolean ignoreAdvancedBlocks = true;
 
     /**
      * Creates a new NodeBlockProcessor using the given BlockStore and Blockchain.
@@ -84,6 +87,7 @@ public class NodeBlockProcessor implements BlockProcessor {
         this.nodeInformation = new BlockNodeInformation();
         worldManager.setNodeBlockProcessor(this);
         this.channelManager = worldManager.getChannelManager();
+        this.blocksForPeers = RskSystemProperties.RSKCONFIG.getBlocksForPeers();
     }
 
     /**
@@ -97,6 +101,7 @@ public class NodeBlockProcessor implements BlockProcessor {
         this.blockchain = blockchain;
         this.nodeInformation = new BlockNodeInformation();
         this.channelManager = null;
+        this.blocksForPeers = RskSystemProperties.RSKCONFIG.getBlocksForPeers();
     }
 
     @Override
@@ -147,8 +152,14 @@ public class NodeBlockProcessor implements BlockProcessor {
     }
 
     private boolean hasHeader(@Nonnull final BlockHeader h) {
-        if (hasBlock(h.getHash())) return true;
-        if (store.hasHeader(h.getHash())) return true;
+        if (hasBlock(h.getHash())) {
+            return true;
+        }
+
+        if (store.hasHeader(h.getHash())) {
+            return true;
+        }
+        
         return false;
     }
 
@@ -200,7 +211,7 @@ public class NodeBlockProcessor implements BlockProcessor {
         if (blockNumber > this.lastKnownBlockNumber)
             this.lastKnownBlockNumber = blockNumber;
 
-        if (blockNumber >= bestBlockNumber + 1000) {
+        if (ignoreAdvancedBlocks && blockNumber >= bestBlockNumber + 1000) {
             logger.trace("Block too advanced {} {} from {} ", blockNumber, block.getShortHash(), sender != null ? sender.getNodeID().toString() : "N/A");
             return new BlockProcessResult(false, null);
         }
@@ -328,7 +339,7 @@ public class NodeBlockProcessor implements BlockProcessor {
         if (peerBestBlockNumber > this.lastKnownBlockNumber)
             this.lastKnownBlockNumber = peerBestBlockNumber;
 
-        for (long n = peerBestBlockNumber; n <= bestBlockNumber && n < peerBestBlockNumber + 25; n++) {
+        for (long n = peerBestBlockNumber; n <= bestBlockNumber && n < peerBestBlockNumber + this.blocksForPeers; n++) {
             logger.trace("Trying to send block {}", n);
             
             final Block b = this.blockchain.getBlockByNumber(n);
@@ -355,15 +366,6 @@ public class NodeBlockProcessor implements BlockProcessor {
 
         if (block == null) {
             return;
-        }
-
-        for (BlockHeader uncleHeader : block.getUncleList()) {
-            Block uncle = this.getBlock(uncleHeader.getHash());
-
-            if (uncle != null) {
-                nodeInformation.addBlockToNode(new ByteArrayWrapper(uncle.getHash()), sender.getNodeID());
-                sender.sendMessage(new BlockMessage(uncle));
-            }
         }
 
         nodeInformation.addBlockToNode(new ByteArrayWrapper(hash), sender.getNodeID());
@@ -643,6 +645,12 @@ public class NodeBlockProcessor implements BlockProcessor {
             logger.trace("Sending status best block {} to all", status.getBestBlockNumber());
             this.channelManager.broadcastStatus(status);
         }
+    }
+
+    @Override
+    public void acceptAnyBlock()
+    {
+        this.ignoreAdvancedBlocks = false;
     }
 
     private void sendStatus(MessageSender sender) {

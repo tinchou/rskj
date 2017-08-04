@@ -24,7 +24,6 @@ import co.rsk.net.discovery.table.OperationResult;
 import co.rsk.net.discovery.table.PeerDiscoveryRequestBuilder;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.ethereum.crypto.ECKey;
 import org.ethereum.db.ByteArrayWrapper;
 import org.ethereum.net.rlpx.Node;
@@ -47,7 +46,7 @@ public class PeerExplorer {
     public static final int MAX_NODES_TO_ASK = 24;
     public static final int MAX_NODES_TO_CHECK = 16;
 
-    private Set<InetSocketAddress> bootNodes = new ConcurrentHashSet<>();
+    private Set<InetSocketAddress> bootNodes = ConcurrentHashMap.newKeySet();
     private Map<String, PeerDiscoveryRequest> pendingPingRequests = new ConcurrentHashMap<>();
     private Map<String, PeerDiscoveryRequest> pendingFindNodeRequests = new ConcurrentHashMap<>();
 

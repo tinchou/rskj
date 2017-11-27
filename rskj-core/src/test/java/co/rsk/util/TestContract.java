@@ -228,6 +228,6 @@ public class TestContract {
         byte[] bytecode = Hex.decode(this.bytecode);
         byte[] encodedCall = this.functions.get(functionName).encode(args);
 
-        return new RskTestFactory().executeRawContract(bytecode, encodedCall, value);
+        return new RskTestFactory().createAndRunContract(bytecode, encodedCall, value);
     }
 }

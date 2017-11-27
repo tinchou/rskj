@@ -25,6 +25,7 @@ import org.ethereum.util.ByteUtil;
 import org.ethereum.vm.program.Program;
 import org.ethereum.vm.program.Program.BadJumpDestinationException;
 import org.ethereum.vm.program.Program.StackTooSmallException;
+import org.ethereum.vm.program.ProgramResult;
 import org.ethereum.vm.program.invoke.ProgramInvokeMockImpl;
 import org.junit.*;
 import org.junit.runners.MethodSorters;
@@ -3077,6 +3078,20 @@ public class VMTest {
         vm.step(program);  // push
         vm.step(program);  // push
         vm.step(program);  // CODEREPLACE
+    }
+
+    @Test
+    public void testCREATEWithTooLargeContract() {
+        VM vm = new VM();
+        program = new Program(
+                Hex.decode("606060405260043610610041576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff16806319ff1d2114610046575b600080fd5b341561005157600080fd5b6100596100d4565b6040518080602001828103825283818151815260200191508051906020019080838360005b8381101561009957808201518184015260208101905061007e565b50505050905090810190601f1680156100c65780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b6100dc610117565b6040805190810160405280600a81526020017f6368696e6368696c6c6100000000000000000000000000000000000000000000815250905090565b6020604051908101604052806000815250905600a165627a7a7230582043fd5aff0f077e6da5e30c15fdba5e724b7e4aa2c190c5ffe86f87f7bf18a47a0029"),
+                invoke);
+        vm.play(program);
+
+        ProgramResult result = program.getResult();
+        assertTrue(program.isStopped());
+        assertFalse(result.isRevert());
+        assertNull(result.getException());
     }
 }
 

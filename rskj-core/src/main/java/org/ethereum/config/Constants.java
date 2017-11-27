@@ -32,7 +32,7 @@ import java.math.BigInteger;
  * Created by Anton Nashatyrev on 25.02.2016.
  */
 public class Constants {
-    private static final int MAX_CONTRACT_SIZE = 0x6000;
+    private static final int MAX_CONTRACT_SIZE = 0x6;
     private int maximumExtraDataSize = 32;
     private int minGasLimit = 3000000;
     private int gasLimitBoundDivisor = 1024;

@@ -50,26 +50,44 @@ public class RskTestFactory {
         return getRepository().getContractDetails(contractAccount.getAddress());
     }
 
-    public ProgramResult executeRawContract(byte[] bytecode, byte[] encodedCall, BigInteger value) {
+    public ProgramResult createContract(byte[] bytecode) {
         Account sender = new AccountBuilder(getBlockchain())
                 .name("sender")
                 // a large balance will allow running any contract
-                .balance(BigInteger.valueOf(10000000))
+                .balance(BigInteger.valueOf(1000000000000L))
                 .build();
+        Transaction creationTx = contractCreateTx(sender, bytecode);
+        return executeTransaction(creationTx).getResult();
+    }
+
+    public ProgramResult createAndRunContract(byte[] bytecode, byte[] encodedCall, BigInteger value) {
+        Account sender = new AccountBuilder(getBlockchain())
+                .name("sender")
+                // a large balance will allow running any contract
+                .balance(BigInteger.valueOf(1000000000000L))
+                .build();
+        Transaction creationTx = contractCreateTx(sender, bytecode);
+        executeTransaction(creationTx);
+        return runContract(sender, creationTx.getContractAddress(), encodedCall, value);
+    }
+
+    private Transaction contractCreateTx(Account sender, byte[] bytecode) {
         BigInteger nonceCreate = getRepository().getNonce(sender.getAddress());
-        Transaction creationTx = new TransactionBuilder()
+        return new TransactionBuilder()
                 .gasLimit(BigInteger.valueOf(3000000))
                 .sender(sender)
                 .data(bytecode)
                 .nonce(nonceCreate.longValue())
                 .build();
-        executeTransaction(creationTx);
+    }
+
+    private ProgramResult runContract(Account sender, byte[] contractAddress, byte[] encodedCall, BigInteger value) {
         BigInteger nonceExecute = getRepository().getNonce(sender.getAddress());
         Transaction transaction = new TransactionBuilder()
                 // a large gas limit will allow running any contract
                 .gasLimit(BigInteger.valueOf(3000000))
                 .sender(sender)
-                .receiverAddress(creationTx.getContractAddress())
+                .receiverAddress(contractAddress)
                 .data(encodedCall)
                 .nonce(nonceExecute.longValue())
                 .value(value)

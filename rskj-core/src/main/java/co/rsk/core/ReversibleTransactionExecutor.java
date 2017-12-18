@@ -19,21 +19,54 @@
 
 package co.rsk.core;
 
-import org.ethereum.core.Block;
-import org.ethereum.core.Repository;
-import org.ethereum.core.Transaction;
-import org.ethereum.core.TransactionExecutor;
+import org.ethereum.core.*;
 import org.ethereum.db.BlockStore;
 import org.ethereum.db.ReceiptStore;
 import org.ethereum.rpc.Web3;
 import org.ethereum.rpc.converters.CallArgumentsToByteArray;
 import org.ethereum.vm.program.invoke.ProgramInvokeFactory;
+import org.ethereum.vm.program.invoke.ProgramInvokeFactoryImpl;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
-public final class ReversibleTransactionExecutor extends TransactionExecutor {
+@Component
+public class ReversibleTransactionExecutor {
+    private final Blockchain blockchain;
+    private final Repository repository;
+    private final BlockStore blockStore;
+    private final ReceiptStore receiptStore;
 
-    private ReversibleTransactionExecutor(Transaction tx, byte[] coinbase, Repository track, BlockStore blockStore, ReceiptStore receiptStore, ProgramInvokeFactory programInvokeFactory, Block executionBlock) {
-        super(tx, 0, coinbase, track, blockStore, receiptStore, programInvokeFactory, executionBlock);
-        setLocalCall(true);
+    @Autowired
+    public ReversibleTransactionExecutor(Blockchain blockchain,
+                                         Repository repository,
+                                         BlockStore blockStore,
+                                         ReceiptStore receiptStore) {
+        this.blockchain = blockchain;
+        this.repository = repository;
+        this.blockStore = blockStore;
+        this.receiptStore = receiptStore;
+    }
+
+    public TransactionExecutor executeTransaction(byte[] gasPrice,
+                                                  byte[] gasLimit,
+                                                  byte[] toAddress,
+                                                  byte[] value,
+                                                  byte[] data,
+                                                  byte[] fromAddress) {
+        Block bestBlock = blockchain.getBestBlock();
+        return executeTransaction(
+                bestBlock.getCoinbase(),
+                repository,
+                blockStore,
+                receiptStore,
+                new ProgramInvokeFactoryImpl(),
+                bestBlock,
+                gasPrice,
+                gasLimit,
+                toAddress,
+                value,
+                data,
+                fromAddress);
     }
 
     public static TransactionExecutor executeTransaction(byte[] coinbase,
@@ -53,8 +86,8 @@ public final class ReversibleTransactionExecutor extends TransactionExecutor {
         byte[] nonce = repository.getNonce(fromAddress).toByteArray();
         UnsignedTransaction tx = new UnsignedTransaction(nonce, gasPrice, gasLimit, toAddress, value, data, fromAddress);
 
-        ReversibleTransactionExecutor executor = new ReversibleTransactionExecutor(tx, coinbase, repository, blockStore, receiptStore, programInvokeFactory, executionBlock);
-        return executor.executeTransaction();
+        TransactionExecutor executor = getExecutor(coinbase, blockStore, receiptStore, programInvokeFactory, executionBlock, repository, tx);
+        return executeTransaction(executor);
     }
 
     public static TransactionExecutor executeTransaction(byte[] coinbase,
@@ -74,12 +107,18 @@ public final class ReversibleTransactionExecutor extends TransactionExecutor {
                 hexArgs.getFromAddress());
     }
 
-    private TransactionExecutor executeTransaction() {
-        init();
-        execute();
-        go();
-        finalization();
-        return this;
+    private static TransactionExecutor getExecutor(byte[] coinbase, BlockStore blockStore, ReceiptStore receiptStore, ProgramInvokeFactory programInvokeFactory, Block executionBlock, Repository repository, UnsignedTransaction tx) {
+        TransactionExecutor executor = new TransactionExecutor(tx, 0, coinbase, repository, blockStore, receiptStore, programInvokeFactory, executionBlock);
+        executor.setLocalCall(true);
+        return executor;
+    }
+
+    private static TransactionExecutor executeTransaction(TransactionExecutor executor) {
+        executor.init();
+        executor.execute();
+        executor.go();
+        executor.finalization();
+        return executor;
     }
 
     private static class UnsignedTransaction extends Transaction {

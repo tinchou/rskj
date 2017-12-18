@@ -22,21 +22,19 @@ package org.ethereum.facade;
 import co.rsk.core.ReversibleTransactionExecutor;
 import org.ethereum.config.SystemProperties;
 import org.ethereum.core.*;
+import org.ethereum.core.Blockchain;
 import org.ethereum.core.PendingState;
-import org.ethereum.core.Repository;
-import org.ethereum.db.ReceiptStore;
 import org.ethereum.listener.CompositeEthereumListener;
 import org.ethereum.listener.EthereumListener;
 import org.ethereum.listener.GasPriceTracker;
-import org.ethereum.manager.WorldManager;
 import org.ethereum.net.server.ChannelManager;
 import org.ethereum.net.server.PeerServer;
 import org.ethereum.net.submit.TransactionExecutor;
 import org.ethereum.net.submit.TransactionTask;
 import org.ethereum.rpc.Web3;
+import org.ethereum.rpc.converters.CallArgumentsToByteArray;
 import org.ethereum.util.ByteUtil;
 import org.ethereum.vm.program.ProgramResult;
-import org.ethereum.vm.program.invoke.ProgramInvokeFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.spongycastle.util.encoders.Hex;
@@ -51,39 +49,32 @@ import java.util.concurrent.Future;
 
 public class EthereumImpl implements Ethereum {
 
-    private static final Logger logger = LoggerFactory.getLogger("facade");
     private static final Logger gLogger = LoggerFactory.getLogger("general");
 
-    private final WorldManager worldManager;
     private final ChannelManager channelManager;
     private final PeerServer peerServer;
-    private final ProgramInvokeFactory programInvokeFactory;
     private final PendingState pendingState;
     private final SystemProperties config;
     private final CompositeEthereumListener compositeEthereumListener;
-    private final ReceiptStore receiptStore;
+    private final ReversibleTransactionExecutor reversibleTransactionExecutor;
+    private final org.ethereum.core.Blockchain blockchain;
 
-    private GasPriceTracker gasPriceTracker = new GasPriceTracker();
-    private final Repository repository;
+    private final GasPriceTracker gasPriceTracker = new GasPriceTracker();
 
-    public EthereumImpl(WorldManager worldManager,
-                        ChannelManager channelManager,
+    public EthereumImpl(ChannelManager channelManager,
                         PeerServer peerServer,
-                        ProgramInvokeFactory programInvokeFactory,
+                        Blockchain blockchain,
                         PendingState pendingState,
                         SystemProperties config,
                         CompositeEthereumListener compositeEthereumListener,
-                        ReceiptStore receiptStore,
-                        Repository repository) {
-        this.worldManager = worldManager;
+                        ReversibleTransactionExecutor reversibleTransactionExecutor) {
         this.channelManager = channelManager;
         this.peerServer = peerServer;
-        this.programInvokeFactory = programInvokeFactory;
         this.pendingState = pendingState;
         this.config = config;
         this.compositeEthereumListener = compositeEthereumListener;
-        this.receiptStore = receiptStore;
-        this.repository = repository;
+        this.reversibleTransactionExecutor = reversibleTransactionExecutor;
+        this.blockchain = blockchain;
     }
 
     @Override
@@ -103,15 +94,10 @@ public class EthereumImpl implements Ethereum {
     }
 
     @Override
-    public org.ethereum.facade.Blockchain getBlockchain() {
-        return (org.ethereum.facade.Blockchain)worldManager.getBlockchain();
-    }
-
-    @Override
     public ImportResult addNewMinedBlock(final @Nonnull Block block) {
-        final ImportResult importResult = worldManager.getBlockchain().tryToConnect(block);
+        final ImportResult importResult = blockchain.tryToConnect(block);
 
-        if (worldManager.getBlockchain().getBlockByHash(block.getHash()) != null) {
+        if (blockchain.getBlockByHash(block.getHash()) != null) {
             channelManager.broadcastBlock(block, null);
         }
         return importResult;
@@ -119,7 +105,7 @@ public class EthereumImpl implements Ethereum {
 
     @Override
     public void addListener(EthereumListener listener) {
-        worldManager.addListener(listener);
+        compositeEthereumListener.addListener(listener);
     }
 
     @Override
@@ -164,21 +150,18 @@ public class EthereumImpl implements Ethereum {
 
     @Override
     public ProgramResult callConstant(Web3.CallArguments args) {
-        Block bestBlock = getBlockchain().getBestBlock();
-        return ReversibleTransactionExecutor.executeTransaction(
-                bestBlock.getCoinbase(),
-                repository,
-                worldManager.getBlockStore(),
-                receiptStore,
-                programInvokeFactory,
-                bestBlock,
-                args
+        if (args.from == null) {
+            args.from = "";
+        }
+        CallArgumentsToByteArray hexArgs = new CallArgumentsToByteArray(args);
+        return reversibleTransactionExecutor.executeTransaction(
+                hexArgs.getGasPrice(),
+                hexArgs.getGasLimit(),
+                hexArgs.getToAddress(),
+                hexArgs.getValue(),
+                hexArgs.getData(),
+                hexArgs.getFromAddress()
         ).getResult();
-    }
-
-    @Override
-    public List<Transaction> getWireTransactions() {
-        return worldManager.getPendingState().getWireTransactions();
     }
 
     @Override

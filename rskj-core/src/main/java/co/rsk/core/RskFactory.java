@@ -69,7 +69,6 @@ import org.ethereum.net.server.*;
 import org.ethereum.solidity.compiler.SolidityCompiler;
 import org.ethereum.sync.SyncPool;
 import org.ethereum.util.BuildInfo;
-import org.ethereum.vm.program.invoke.ProgramInvokeFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
@@ -88,42 +87,40 @@ public class RskFactory {
 
     @Bean
     public Rsk getRsk(WorldManager worldManager,
-                      Blockchain blockchain,
+                      BlockChainImpl blockchain,
                       ChannelManager channelManager,
                       PeerServer peerServer,
-                      ProgramInvokeFactory programInvokeFactory,
                       PendingState pendingState,
                       SystemProperties config,
                       CompositeEthereumListener compositeEthereumListener,
-                      ReceiptStore receiptStore,
                       PeerScoringManager peerScoringManager,
                       NodeBlockProcessor nodeBlockProcessor,
                       NodeMessageHandler nodeMessageHandler,
                       RskSystemProperties rskSystemProperties,
-                      org.ethereum.core.Repository repository) {
+                      ReversibleTransactionExecutor reversibleTransactionExecutor) {
 
         logger.info("Running {},  core version: {}-{}", config.genesisInfo(), config.projectVersion(), config.projectVersionModifier());
         BuildInfo.printInfo();
 
-        RskImpl rsk = new RskImpl(worldManager, channelManager, peerServer, programInvokeFactory,
-                pendingState, config, compositeEthereumListener, receiptStore, nodeBlockProcessor, repository);
+        RskImpl rsk = new RskImpl(worldManager, channelManager, peerServer,
+                pendingState, config, compositeEthereumListener, nodeBlockProcessor, reversibleTransactionExecutor, blockchain);
 
         rsk.init();
-        rsk.getBlockchain().setRsk(true);  //TODO: check if we can remove this field from org.ethereum.facade.Blockchain
+        blockchain.setRsk(true);  //TODO: check if we can remove this field from org.ethereum.facade.Blockchain
         if (logger.isInfoEnabled()) {
             String versions = EthVersion.supported().stream().map(EthVersion::name).collect(Collectors.joining(", "));
             logger.info("Capability eth version: [{}]", versions);
         }
         if (rskSystemProperties.isBlocksEnabled()) {
-            setupRecorder(rsk, rskSystemProperties.blocksRecorder());
+            setupRecorder(blockchain, rskSystemProperties.blocksRecorder());
             setupPlayer(rsk, channelManager, blockchain, rskSystemProperties.blocksPlayer());
         }
         return rsk;
     }
 
-    private void setupRecorder(RskImpl rsk, @Nullable String blocksRecorderFileName) {
+    private void setupRecorder(BlockChainImpl blockchain, @Nullable String blocksRecorderFileName) {
         if (blocksRecorderFileName != null) {
-            rsk.getBlockchain().setBlockRecorder(new FileBlockRecorder(blocksRecorderFileName));
+            blockchain.setBlockRecorder(new FileBlockRecorder(blocksRecorderFileName));
         }
     }
 

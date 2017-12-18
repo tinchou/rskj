@@ -27,7 +27,6 @@ import org.ethereum.rpc.Web3;
 import org.ethereum.vm.program.ProgramResult;
 
 import java.math.BigInteger;
-import java.util.List;
 import java.util.concurrent.Future;
 
 /**
@@ -35,8 +34,6 @@ import java.util.concurrent.Future;
  * @since 27.07.2014
  */
 public interface Ethereum {
-
-    Blockchain getBlockchain();
 
     void addListener(EthereumListener listener);
 
@@ -74,11 +71,6 @@ public interface Ethereum {
     Future<Transaction> submitTransaction(Transaction transaction);
 
     void init();
-
-    /**
-     * @return - currently pending transactions received from the net
-     */
-    List<Transaction> getWireTransactions();
 
     /**
      * Calculates a 'reasonable' Gas price based on statistics of the latest transaction's Gas prices

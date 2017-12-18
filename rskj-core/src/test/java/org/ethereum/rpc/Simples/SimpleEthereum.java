@@ -21,7 +21,6 @@ package org.ethereum.rpc.Simples;
 import org.ethereum.core.Block;
 import org.ethereum.core.ImportResult;
 import org.ethereum.core.Transaction;
-import org.ethereum.facade.Blockchain;
 import org.ethereum.facade.Ethereum;
 import org.ethereum.facade.Repository;
 import org.ethereum.listener.EthereumListener;
@@ -32,7 +31,6 @@ import org.ethereum.vm.program.ProgramResult;
 
 import javax.annotation.Nonnull;
 import java.math.BigInteger;
-import java.util.List;
 import java.util.concurrent.Future;
 
 /**
@@ -50,11 +48,6 @@ public class SimpleEthereum implements Ethereum {
 
     public SimpleEthereum(SimpleWorldManager worldManager) {
         this.worldManager = worldManager;
-    }
-
-    @Override
-    public Blockchain getBlockchain() {
-        return null;
     }
 
     @Override
@@ -92,11 +85,6 @@ public class SimpleEthereum implements Ethereum {
     @Override
     public void init() {
 
-    }
-
-    @Override
-    public List<Transaction> getWireTransactions() {
-        return null;
     }
 
     @Override

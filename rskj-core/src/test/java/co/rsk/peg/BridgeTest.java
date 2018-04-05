@@ -48,6 +48,7 @@ import java.time.Instant;
 import java.util.*;
 
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.Matchers.empty;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.*;
 
@@ -369,6 +370,8 @@ public class BridgeTest {
         }
         catch (RuntimeException ex) {
             Assert.assertEquals("Exception onBlock", ex.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -576,11 +579,11 @@ public class BridgeTest {
         hashes.add(Sha256Hash.of("hash_4".getBytes()));
 
         for (Sha256Hash hash : hashes) {
-            Assert.assertTrue(bridge.isBtcTxHashAlreadyProcessed(new Object[]{hash.toString()}));
+            Assert.assertTrue(bridge.isBtcTxHashAlreadyProcessed(new Object[]{hash.toString()}).get());
             verify(bridgeSupportMock).isBtcTxHashAlreadyProcessed(hash);
         }
-        Assert.assertFalse(bridge.isBtcTxHashAlreadyProcessed(new Object[]{Sha256Hash.of("anything".getBytes()).toString()}));
-        Assert.assertFalse(bridge.isBtcTxHashAlreadyProcessed(new Object[]{Sha256Hash.of("yetanotheranything".getBytes()).toString()}));
+        Assert.assertFalse(bridge.isBtcTxHashAlreadyProcessed(new Object[]{Sha256Hash.of("anything".getBytes()).toString()}).get());
+        Assert.assertFalse(bridge.isBtcTxHashAlreadyProcessed(new Object[]{Sha256Hash.of("yetanotheranything".getBytes()).toString()}).get());
     }
 
     @Test
@@ -615,10 +618,10 @@ public class BridgeTest {
         hashes.put(Sha256Hash.of("hash_4".getBytes()), 4L);
 
         for (Map.Entry<Sha256Hash, Long> entry : hashes.entrySet()) {
-            Assert.assertEquals(entry.getValue(), bridge.getBtcTxHashProcessedHeight(new Object[]{entry.getKey().toString()}));
+            Assert.assertEquals(entry.getValue(), bridge.getBtcTxHashProcessedHeight(new Object[]{entry.getKey().toString()}).get());
             verify(bridgeSupportMock).getBtcTxHashProcessedHeight(entry.getKey());
         }
-        Assert.assertNull(bridge.getBtcTxHashProcessedHeight(new Object[]{Sha256Hash.of("anything".getBytes()).toString()}));
+        Assert.assertThat(bridge.getBtcTxHashProcessedHeight(new Object[]{Sha256Hash.of("anything".getBytes()).toString()}).isPresent(), is(false));
     }
 
     @Test
@@ -646,7 +649,7 @@ public class BridgeTest {
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
         when(bridgeSupportMock.getFederationSize()).thenReturn(1234);
 
-        Assert.assertEquals(1234, bridge.getFederationSize(new Object[]{}).intValue());
+        Assert.assertEquals(1234, bridge.getFederationSize(new Object[]{}).get().intValue());
     }
 
     @Test
@@ -657,7 +660,7 @@ public class BridgeTest {
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
         when(bridgeSupportMock.getFederationThreshold()).thenReturn(5678);
 
-        Assert.assertEquals(5678, bridge.getFederationThreshold(new Object[]{}).intValue());
+        Assert.assertEquals(5678, bridge.getFederationThreshold(new Object[]{}).get().intValue());
     }
 
     @Test
@@ -668,7 +671,7 @@ public class BridgeTest {
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
         when(bridgeSupportMock.getFederationCreationTime()).thenReturn(Instant.ofEpochMilli(5000));
 
-        Assert.assertEquals(5000, bridge.getFederationCreationTime(new Object[]{}).intValue());
+        Assert.assertEquals(5000, bridge.getFederationCreationTime(new Object[]{}).get().intValue());
     }
 
     @Test
@@ -678,7 +681,7 @@ public class BridgeTest {
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
         when(bridgeSupportMock.getFederationCreationBlockNumber()).thenReturn(42L);
 
-        Assert.assertThat(bridge.getFederationCreationBlockNumber(new Object[]{}), is(42L));
+        Assert.assertThat(bridge.getFederationCreationBlockNumber(new Object[]{}).get(), is(42L));
     }
 
     @Test
@@ -690,9 +693,9 @@ public class BridgeTest {
         when(bridgeSupportMock.getFederatorPublicKey(any(int.class))).then((InvocationOnMock invocation) ->
                 BigInteger.valueOf(invocation.getArgumentAt(0, int.class)).toByteArray());
 
-        Assert.assertTrue(Arrays.equals(new byte[]{10}, bridge.getFederatorPublicKey(new Object[]{BigInteger.valueOf(10)})));
-        Assert.assertTrue(Arrays.equals(new byte[]{20}, bridge.getFederatorPublicKey(new Object[]{BigInteger.valueOf(20)})));
-        Assert.assertTrue(Arrays.equals(new byte[]{1, 0}, bridge.getFederatorPublicKey(new Object[]{BigInteger.valueOf(256)})));
+        Assert.assertTrue(Arrays.equals(new byte[]{10}, bridge.getFederatorPublicKey(new Object[]{BigInteger.valueOf(10)}).get()));
+        Assert.assertTrue(Arrays.equals(new byte[]{20}, bridge.getFederatorPublicKey(new Object[]{BigInteger.valueOf(20)}).get()));
+        Assert.assertTrue(Arrays.equals(new byte[]{1, 0}, bridge.getFederatorPublicKey(new Object[]{BigInteger.valueOf(256)}).get()));
     }
 
     @Test
@@ -703,7 +706,7 @@ public class BridgeTest {
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
         when(bridgeSupportMock.getRetiringFederationSize()).thenReturn(1234);
 
-        Assert.assertEquals(1234, bridge.getRetiringFederationSize(new Object[]{}).intValue());
+        Assert.assertEquals(1234, bridge.getRetiringFederationSize(new Object[]{}).get().intValue());
     }
 
     @Test
@@ -714,7 +717,7 @@ public class BridgeTest {
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
         when(bridgeSupportMock.getRetiringFederationThreshold()).thenReturn(5678);
 
-        Assert.assertEquals(5678, bridge.getRetiringFederationThreshold(new Object[]{}).intValue());
+        Assert.assertEquals(5678, bridge.getRetiringFederationThreshold(new Object[]{}).get().intValue());
     }
 
     @Test
@@ -725,7 +728,7 @@ public class BridgeTest {
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
         when(bridgeSupportMock.getRetiringFederationCreationTime()).thenReturn(Instant.ofEpochMilli(5000));
 
-        Assert.assertEquals(5000, bridge.getRetiringFederationCreationTime(new Object[]{}).intValue());
+        Assert.assertEquals(5000, bridge.getRetiringFederationCreationTime(new Object[]{}).get().intValue());
     }
 
     @Test
@@ -735,7 +738,7 @@ public class BridgeTest {
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
         when(bridgeSupportMock.getRetiringFederationCreationBlockNumber()).thenReturn(42L);
 
-        Assert.assertThat(bridge.getRetiringFederationCreationBlockNumber(new Object[]{}), is(42L));
+        Assert.assertThat(bridge.getRetiringFederationCreationBlockNumber(new Object[]{}).get(), is(42L));
     }
 
     @Test
@@ -747,9 +750,9 @@ public class BridgeTest {
         when(bridgeSupportMock.getRetiringFederatorPublicKey(any(int.class))).then((InvocationOnMock invocation) ->
                 BigInteger.valueOf(invocation.getArgumentAt(0, int.class)).toByteArray());
 
-        Assert.assertTrue(Arrays.equals(new byte[]{10}, bridge.getRetiringFederatorPublicKey(new Object[]{BigInteger.valueOf(10)})));
-        Assert.assertTrue(Arrays.equals(new byte[]{20}, bridge.getRetiringFederatorPublicKey(new Object[]{BigInteger.valueOf(20)})));
-        Assert.assertTrue(Arrays.equals(new byte[]{1, 0}, bridge.getRetiringFederatorPublicKey(new Object[]{BigInteger.valueOf(256)})));
+        Assert.assertTrue(Arrays.equals(new byte[]{10}, bridge.getRetiringFederatorPublicKey(new Object[]{BigInteger.valueOf(10)}).get()));
+        Assert.assertTrue(Arrays.equals(new byte[]{20}, bridge.getRetiringFederatorPublicKey(new Object[]{BigInteger.valueOf(20)}).get()));
+        Assert.assertTrue(Arrays.equals(new byte[]{1, 0}, bridge.getRetiringFederatorPublicKey(new Object[]{BigInteger.valueOf(256)}).get()));
     }
 
     @Test
@@ -760,7 +763,7 @@ public class BridgeTest {
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
         when(bridgeSupportMock.getPendingFederationSize()).thenReturn(1234);
 
-        Assert.assertEquals(1234, bridge.getPendingFederationSize(new Object[]{}).intValue());
+        Assert.assertEquals(1234, bridge.getPendingFederationSize(new Object[]{}).get().intValue());
     }
 
     @Test
@@ -772,9 +775,9 @@ public class BridgeTest {
         when(bridgeSupportMock.getPendingFederatorPublicKey(any(int.class))).then((InvocationOnMock invocation) ->
                 BigInteger.valueOf(invocation.getArgumentAt(0, int.class)).toByteArray());
 
-        Assert.assertTrue(Arrays.equals(new byte[]{10}, bridge.getPendingFederatorPublicKey(new Object[]{BigInteger.valueOf(10)})));
-        Assert.assertTrue(Arrays.equals(new byte[]{20}, bridge.getPendingFederatorPublicKey(new Object[]{BigInteger.valueOf(20)})));
-        Assert.assertTrue(Arrays.equals(new byte[]{1, 0}, bridge.getPendingFederatorPublicKey(new Object[]{BigInteger.valueOf(256)})));
+        Assert.assertTrue(Arrays.equals(new byte[]{10}, bridge.getPendingFederatorPublicKey(new Object[]{BigInteger.valueOf(10)}).get()));
+        Assert.assertTrue(Arrays.equals(new byte[]{20}, bridge.getPendingFederatorPublicKey(new Object[]{BigInteger.valueOf(20)}).get()));
+        Assert.assertTrue(Arrays.equals(new byte[]{1, 0}, bridge.getPendingFederatorPublicKey(new Object[]{BigInteger.valueOf(256)}).get()));
     }
 
     @Test
@@ -786,7 +789,7 @@ public class BridgeTest {
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
         when(bridgeSupportMock.voteFederationChange(txMock, new ABICallSpec("create", new byte[][]{}))).thenReturn(123);
 
-        Assert.assertEquals(123, bridge.createFederation(new Object[]{}).intValue());
+        Assert.assertEquals(123, bridge.createFederation(new Object[]{}).get().intValue());
     }
 
     @Test
@@ -799,7 +802,7 @@ public class BridgeTest {
         when(bridgeSupportMock.voteFederationChange(txMock, new ABICallSpec("add", new byte[][] { Hex.decode("aabbccdd") })))
                 .thenReturn(123);
 
-        Assert.assertEquals(123, bridge.addFederatorPublicKey(new Object[]{Hex.decode("aabbccdd")}).intValue());
+        Assert.assertEquals(123, bridge.addFederatorPublicKey(new Object[]{Hex.decode("aabbccdd")}).get().intValue());
     }
 
     @Test
@@ -809,7 +812,7 @@ public class BridgeTest {
         BridgeSupport bridgeSupportMock = mock(BridgeSupport.class);
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
 
-        Assert.assertEquals(-10, bridge.addFederatorPublicKey(new Object[]{ "i'm not a byte array" }).intValue());
+        Assert.assertEquals(-10, bridge.addFederatorPublicKey(new Object[]{ "i'm not a byte array" }).get().intValue());
         verify(bridgeSupportMock, never()).voteFederationChange(any(), any());
     }
 
@@ -823,7 +826,7 @@ public class BridgeTest {
 
         when(bridgeSupportMock.voteFederationChange(txMock, new ABICallSpec("commit", new byte[][] { Hex.decode("01020304") }))).thenReturn(123);
 
-        Assert.assertEquals(123, bridge.commitFederation(new Object[]{ Hex.decode("01020304") }).intValue());
+        Assert.assertEquals(123, bridge.commitFederation(new Object[]{ Hex.decode("01020304") }).get().intValue());
     }
 
     @Test
@@ -833,7 +836,7 @@ public class BridgeTest {
         BridgeSupport bridgeSupportMock = mock(BridgeSupport.class);
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
 
-        Assert.assertEquals(-10, bridge.commitFederation(new Object[]{ "i'm not a byte array" }).intValue());
+        Assert.assertEquals(-10, bridge.commitFederation(new Object[]{ "i'm not a byte array" }).get().intValue());
         verify(bridgeSupportMock, never()).voteFederationChange(any(), any());
     }
 
@@ -846,7 +849,7 @@ public class BridgeTest {
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
         when(bridgeSupportMock.voteFederationChange(txMock, new ABICallSpec("rollback", new byte[][]{}))).thenReturn(456);
 
-        Assert.assertEquals(456, bridge.rollbackFederation(new Object[]{}).intValue());
+        Assert.assertEquals(456, bridge.rollbackFederation(new Object[]{}).get().intValue());
     }
 
     @Test
@@ -857,7 +860,7 @@ public class BridgeTest {
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
         when(bridgeSupportMock.getLockWhitelistSize()).thenReturn(1234);
 
-        Assert.assertEquals(1234, bridge.getLockWhitelistSize(new Object[]{}).intValue());
+        Assert.assertEquals(1234, bridge.getLockWhitelistSize(new Object[]{}).get().intValue());
     }
 
     @Test
@@ -869,8 +872,8 @@ public class BridgeTest {
         when(bridgeSupportMock.getLockWhitelistAddress(any(int.class))).then((InvocationOnMock invocation) ->
                 BigInteger.valueOf(invocation.getArgumentAt(0, int.class)).toString());
 
-        Assert.assertEquals("10", bridge.getLockWhitelistAddress(new Object[]{BigInteger.valueOf(10)}));
-        Assert.assertEquals("20", bridge.getLockWhitelistAddress(new Object[]{BigInteger.valueOf(20)}));
+        Assert.assertEquals("10", bridge.getLockWhitelistAddress(new Object[]{BigInteger.valueOf(10)}).get());
+        Assert.assertEquals("20", bridge.getLockWhitelistAddress(new Object[]{BigInteger.valueOf(20)}).get());
     }
 
     @Test
@@ -882,7 +885,7 @@ public class BridgeTest {
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
         when(bridgeSupportMock.addLockWhitelistAddress(mockedTransaction, "i-am-an-address", BigInteger.valueOf(Coin.COIN.getValue()))).thenReturn(1234);
 
-        Assert.assertEquals(1234, bridge.addLockWhitelistAddress(new Object[]{ "i-am-an-address", BigInteger.valueOf(Coin.COIN.getValue())}).intValue());
+        Assert.assertEquals(1234, bridge.addLockWhitelistAddress(new Object[]{ "i-am-an-address", BigInteger.valueOf(Coin.COIN.getValue())}).get().intValue());
     }
 
     @Test
@@ -894,7 +897,7 @@ public class BridgeTest {
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
         when(bridgeSupportMock.removeLockWhitelistAddress(mockedTransaction, "i-am-an-address")).thenReturn(1234);
 
-        Assert.assertEquals(1234, bridge.removeLockWhitelistAddress(new Object[]{ "i-am-an-address" }).intValue());
+        Assert.assertEquals(1234, bridge.removeLockWhitelistAddress(new Object[]{ "i-am-an-address" }).get().intValue());
     }
 
     @Test
@@ -905,7 +908,7 @@ public class BridgeTest {
         when(bridgeSupportMock.getFeePerKb())
                 .thenReturn(Coin.valueOf(12345678901234L));
 
-        Assert.assertEquals(12345678901234L, bridge.getFeePerKb(new Object[]{}));
+        Assert.assertEquals(Optional.of(12345678901234L), bridge.getFeePerKb(new Object[]{}));
     }
 
     @Test
@@ -918,7 +921,7 @@ public class BridgeTest {
         when(bridgeSupportMock.voteFeePerKbChange(txMock, Coin.valueOf(2)))
                 .thenReturn(123);
 
-        Assert.assertEquals(123, bridge.voteFeePerKbChange(new Object[]{BigInteger.valueOf(2)}).intValue());
+        Assert.assertEquals(123, bridge.voteFeePerKbChange(new Object[]{BigInteger.valueOf(2)}).get().intValue());
     }
 
     @Test
@@ -928,7 +931,7 @@ public class BridgeTest {
         BridgeSupport bridgeSupportMock = mock(BridgeSupport.class);
         Whitebox.setInternalState(bridge, "bridgeSupport", bridgeSupportMock);
 
-        Assert.assertEquals(-10, bridge.voteFeePerKbChange(new Object[]{ "i'm not a byte array" }).intValue());
+        Assert.assertEquals(-10, bridge.voteFeePerKbChange(new Object[]{ "i'm not a byte array" }).get().intValue());
         verify(bridgeSupportMock, never()).voteFederationChange(any(), any());
     }
 

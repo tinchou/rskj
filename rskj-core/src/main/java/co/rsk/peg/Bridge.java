@@ -26,7 +26,6 @@ import co.rsk.panic.PanicProcessor;
 import co.rsk.peg.utils.BridgeEventLogger;
 import co.rsk.peg.utils.BridgeEventLoggerImpl;
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.lang3.tuple.Pair;
 import org.ethereum.core.Block;
 import org.ethereum.core.CallTransaction;
 import org.ethereum.core.Repository;
@@ -49,6 +48,8 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Precompiled contract that manages the 2 way peg between bitcoin and RSK.
@@ -158,8 +159,8 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
     public static final DataWord ADD_SIGNATURE_TOPIC = new DataWord("add_signature_topic".getBytes(StandardCharsets.UTF_8));
     public static final DataWord COMMIT_FEDERATION_TOPIC = new DataWord("commit_federation_topic".getBytes(StandardCharsets.UTF_8));
 
-    private Map<ByteArrayWrapper, CallTransaction.Function> functions = new HashMap<>();
-    private static Map<CallTransaction.Function, Long> functionCostMap = new HashMap<>();
+    private static Map<CallTransaction.Function, Long> functionCosts = getCosts();
+    private static Map<ByteArrayWrapper, CallTransaction.Function> functionSignatures = getEncodedSignatures();
 
     private final RskSystemProperties config;
     private final BridgeConstants bridgeConstants;
@@ -175,53 +176,6 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
         this.config = config;
         this.bridgeConstants = this.config.getBlockchainConfig().getCommonConstants().getBridgeConstants();
         this.contractAddress = contractAddress;
-
-        Arrays.stream(new Object[]{
-            Pair.of(UPDATE_COLLECTIONS, 48000L),
-            Pair.of(RECEIVE_HEADERS, 22000L),
-            Pair.of(REGISTER_BTC_TRANSACTION, 22000L),
-            Pair.of(RELEASE_BTC, 23000L),
-            Pair.of(ADD_SIGNATURE, 70000L),
-            Pair.of(GET_STATE_FOR_BTC_RELEASE_CLIENT, 4000L),
-            Pair.of(GET_STATE_FOR_DEBUGGING, 3_000_000L),
-            Pair.of(GET_BTC_BLOCKCHAIN_BEST_CHAIN_HEIGHT, 19000L),
-            Pair.of(GET_BTC_BLOCKCHAIN_BLOCK_LOCATOR, 76000L),
-            Pair.of(GET_MINIMUM_LOCK_TX_VALUE, 2000L),
-            Pair.of(IS_BTC_TX_HASH_ALREADY_PROCESSED, 23000L),
-            Pair.of(GET_BTC_TX_HASH_PROCESSED_HEIGHT, 22000L),
-            Pair.of(GET_FEDERATION_ADDRESS, 11000L),
-            Pair.of(GET_FEDERATION_SIZE, 10000L),
-            Pair.of(GET_FEDERATION_THRESHOLD, 11000L),
-            Pair.of(GET_FEDERATOR_PUBLIC_KEY, 10000L),
-            Pair.of(GET_FEDERATION_CREATION_TIME, 10000L),
-            Pair.of(GET_FEDERATION_CREATION_BLOCK_NUMBER, 10000L),
-            Pair.of(GET_RETIRING_FEDERATION_ADDRESS, 3000L),
-            Pair.of(GET_RETIRING_FEDERATION_SIZE, 3000L),
-            Pair.of(GET_RETIRING_FEDERATION_THRESHOLD, 3000L),
-            Pair.of(GET_RETIRING_FEDERATOR_PUBLIC_KEY, 3000L),
-            Pair.of(GET_RETIRING_FEDERATION_CREATION_TIME, 3000L),
-            Pair.of(GET_RETIRING_FEDERATION_CREATION_BLOCK_NUMBER, 3000L),
-            Pair.of(CREATE_FEDERATION, 11000L),
-            Pair.of(ADD_FEDERATOR_PUBLIC_KEY, 13000L),
-            Pair.of(COMMIT_FEDERATION, 38000L),
-            Pair.of(ROLLBACK_FEDERATION, 12000L),
-            Pair.of(GET_PENDING_FEDERATION_HASH, 3000L),
-            Pair.of(GET_PENDING_FEDERATION_SIZE, 3000L),
-            Pair.of(GET_PENDING_FEDERATOR_PUBLIC_KEY, 3000L),
-            Pair.of(GET_LOCK_WHITELIST_SIZE, 16000L),
-            Pair.of(GET_LOCK_WHITELIST_ADDRESS, 16000L),
-            Pair.of(ADD_LOCK_WHITELIST_ADDRESS, 25000L),
-            Pair.of(REMOVE_LOCK_WHITELIST_ADDRESS, 24000L),
-            Pair.of(SET_LOCK_WHITELIST_DISABLE_BLOCK_DELAY, 24000L),
-            Pair.of(GET_FEE_PER_KB, 2000L),
-            Pair.of(VOTE_FEE_PER_KB, 10000L)
-        }).forEach((Object obj) -> {
-            Pair<CallTransaction.Function, Long> spec = (Pair<CallTransaction.Function, Long>) obj;
-            CallTransaction.Function func = spec.getLeft();
-            Long cost = spec.getRight();
-            this.functions.put(new ByteArrayWrapper(func.encodeSignature()),  func);
-            functionCostMap.put(func, cost);
-        });
     }
 
     @Override
@@ -235,10 +189,10 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
         Long functionCost;
         Long totalCost;
         if (bridgeParsedData == null) {
-            functionCost = functionCostMap.get(Bridge.RELEASE_BTC);
+            functionCost = functionCosts.get(Bridge.RELEASE_BTC);
             totalCost = functionCost;
         } else {
-            functionCost = functionCostMap.get(bridgeParsedData.function);
+            functionCost = functionCosts.get(bridgeParsedData.function);
 
             if (functionCost == null) {
                 throw new IllegalStateException();
@@ -266,7 +220,7 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
             bridgeParsedData.args = new Object[]{};
         } else {
             byte[] functionSignature = Arrays.copyOfRange(data, 0, 4);
-            bridgeParsedData.function = functions.get(new ByteArrayWrapper(functionSignature));
+            bridgeParsedData.function = functionSignatures.get(new ByteArrayWrapper(functionSignature));
             if (bridgeParsedData.function == null) {
                 logger.warn("Invalid function signature {}.", Hex.toHexString(functionSignature));
                 return null;
@@ -833,5 +787,52 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
         logger.trace("getFeePerKb");
 
         return bridgeSupport.getFeePerKb().getValue();
+    }
+
+    private static Map<CallTransaction.Function, Long> getCosts() {
+        Map<CallTransaction.Function, Long> costs = new HashMap<>();
+        costs.put(ADD_FEDERATOR_PUBLIC_KEY, 13000L);
+        costs.put(ADD_LOCK_WHITELIST_ADDRESS, 25000L);
+        costs.put(ADD_SIGNATURE, 70000L);
+        costs.put(COMMIT_FEDERATION, 38000L);
+        costs.put(CREATE_FEDERATION, 11000L);
+        costs.put(GET_BTC_BLOCKCHAIN_BEST_CHAIN_HEIGHT, 19000L);
+        costs.put(GET_BTC_BLOCKCHAIN_BLOCK_LOCATOR, 76000L);
+        costs.put(GET_BTC_TX_HASH_PROCESSED_HEIGHT, 22000L);
+        costs.put(GET_FEDERATION_ADDRESS, 11000L);
+        costs.put(GET_FEDERATION_CREATION_BLOCK_NUMBER, 10000L);
+        costs.put(GET_FEDERATION_CREATION_TIME, 10000L);
+        costs.put(GET_FEDERATION_SIZE, 10000L);
+        costs.put(GET_FEDERATION_THRESHOLD, 11000L);
+        costs.put(GET_FEDERATOR_PUBLIC_KEY, 10000L);
+        costs.put(GET_FEE_PER_KB, 2000L);
+        costs.put(GET_LOCK_WHITELIST_ADDRESS, 16000L);
+        costs.put(GET_LOCK_WHITELIST_SIZE, 16000L);
+        costs.put(GET_MINIMUM_LOCK_TX_VALUE, 2000L);
+        costs.put(GET_PENDING_FEDERATION_HASH, 3000L);
+        costs.put(GET_PENDING_FEDERATION_SIZE, 3000L);
+        costs.put(GET_PENDING_FEDERATOR_PUBLIC_KEY, 3000L);
+        costs.put(GET_RETIRING_FEDERATION_ADDRESS, 3000L);
+        costs.put(GET_RETIRING_FEDERATION_CREATION_BLOCK_NUMBER, 3000L);
+        costs.put(GET_RETIRING_FEDERATION_CREATION_TIME, 3000L);
+        costs.put(GET_RETIRING_FEDERATION_SIZE, 3000L);
+        costs.put(GET_RETIRING_FEDERATION_THRESHOLD, 3000L);
+        costs.put(GET_RETIRING_FEDERATOR_PUBLIC_KEY, 3000L);
+        costs.put(GET_STATE_FOR_BTC_RELEASE_CLIENT, 4000L);
+        costs.put(GET_STATE_FOR_DEBUGGING, 3_000_000L);
+        costs.put(IS_BTC_TX_HASH_ALREADY_PROCESSED, 23000L);
+        costs.put(RECEIVE_HEADERS, 22000L);
+        costs.put(REGISTER_BTC_TRANSACTION, 22000L);
+        costs.put(RELEASE_BTC, 23000L);
+        costs.put(REMOVE_LOCK_WHITELIST_ADDRESS, 24000L);
+        costs.put(ROLLBACK_FEDERATION, 12000L);
+        costs.put(SET_LOCK_WHITELIST_DISABLE_BLOCK_DELAY, 24000L);
+        costs.put(UPDATE_COLLECTIONS, 48000L);
+        costs.put(VOTE_FEE_PER_KB, 10000L);
+        return costs;
+    }
+
+    private static Map<ByteArrayWrapper, CallTransaction.Function> getEncodedSignatures() {
+        return functionCosts.keySet().stream().collect(Collectors.toMap(func -> new ByteArrayWrapper(func.encodeSignature()), Function.identity()));
     }
 }

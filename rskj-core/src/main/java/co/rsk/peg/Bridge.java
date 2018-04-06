@@ -42,8 +42,6 @@ import org.slf4j.LoggerFactory;
 import org.spongycastle.util.encoders.Hex;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -162,6 +160,7 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
     private static Map<CallTransaction.Function, Long> functionCosts = getCosts();
     private static Map<ByteArrayWrapper, CallTransaction.Function> functionSignatures = getEncodedSignatures();
 
+    private final Map<CallTransaction.Function, BridgeMethodExecutor> methodExecutors;
     private final RskSystemProperties config;
     private final BridgeConstants bridgeConstants;
 
@@ -176,6 +175,7 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
         this.config = config;
         this.bridgeConstants = this.config.getBlockchainConfig().getCommonConstants().getBridgeConstants();
         this.contractAddress = contractAddress;
+        this.methodExecutors = getMethodExecutors(this);
     }
 
     @Override
@@ -261,21 +261,14 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
 
             this.bridgeSupport = setup();
 
-            // bridgeParsedData.function should be one of the CallTransaction.Function declared above.
-            // If the user tries to call an non-existent function, parseData() will return null.
-            Method m = this.getClass().getMethod(bridgeParsedData.function.name, Object[].class);
-
             Optional<?> result;
-
             try {
-                result = (Optional<?>) m.invoke(this, new Object[]{bridgeParsedData.args});
-            } catch (InvocationTargetException ite) {
-                if (ite.getTargetException() instanceof BridgeIllegalArgumentException) {
-                    logger.warn(ite.getTargetException().getMessage(), ite.getTargetException());
-                    return null;
-                } else {
-                    throw ite;
-                }
+                // bridgeParsedData.function should be one of the CallTransaction.Function declared above.
+                // If the user tries to call an non-existent function, parseData() will return null.
+                result = methodExecutors.get(bridgeParsedData.function).execute(bridgeParsedData.args);
+            } catch (BridgeIllegalArgumentException ex) {
+                logger.warn("Error executing: {}", bridgeParsedData.function.name, ex);
+                return null;
             }
 
             teardown();
@@ -755,6 +748,49 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
         return Optional.of(bridgeSupport.getFeePerKb().getValue());
     }
 
+    private static Map<CallTransaction.Function, BridgeMethodExecutor> getMethodExecutors(Bridge bridge) {
+        Map<CallTransaction.Function, BridgeMethodExecutor> methodExecutors = new HashMap<>();
+        methodExecutors.put(ADD_FEDERATOR_PUBLIC_KEY, bridge::addFederatorPublicKey);
+        methodExecutors.put(ADD_LOCK_WHITELIST_ADDRESS, bridge::addLockWhitelistAddress);
+        methodExecutors.put(ADD_SIGNATURE, bridge::addSignature);
+        methodExecutors.put(COMMIT_FEDERATION, bridge::commitFederation);
+        methodExecutors.put(CREATE_FEDERATION, bridge::createFederation);
+        methodExecutors.put(GET_BTC_BLOCKCHAIN_BEST_CHAIN_HEIGHT, bridge::getBtcBlockchainBestChainHeight);
+        methodExecutors.put(GET_BTC_BLOCKCHAIN_BLOCK_LOCATOR, bridge::getBtcBlockchainBlockLocator);
+        methodExecutors.put(GET_BTC_TX_HASH_PROCESSED_HEIGHT, bridge::getBtcTxHashProcessedHeight);
+        methodExecutors.put(GET_FEDERATION_ADDRESS, bridge::getFederationAddress);
+        methodExecutors.put(GET_FEDERATION_CREATION_BLOCK_NUMBER, bridge::getFederationCreationBlockNumber);
+        methodExecutors.put(GET_FEDERATION_CREATION_TIME, bridge::getFederationCreationTime);
+        methodExecutors.put(GET_FEDERATION_SIZE, bridge::getFederationSize);
+        methodExecutors.put(GET_FEDERATION_THRESHOLD, bridge::getFederationThreshold);
+        methodExecutors.put(GET_FEDERATOR_PUBLIC_KEY, bridge::getFederatorPublicKey);
+        methodExecutors.put(GET_FEE_PER_KB, bridge::getFeePerKb);
+        methodExecutors.put(GET_LOCK_WHITELIST_ADDRESS, bridge::getLockWhitelistAddress);
+        methodExecutors.put(GET_LOCK_WHITELIST_SIZE, bridge::getLockWhitelistSize);
+        methodExecutors.put(GET_MINIMUM_LOCK_TX_VALUE, bridge::getMinimumLockTxValue);
+        methodExecutors.put(GET_PENDING_FEDERATION_HASH, bridge::getPendingFederationHash);
+        methodExecutors.put(GET_PENDING_FEDERATION_SIZE, bridge::getPendingFederationSize);
+        methodExecutors.put(GET_PENDING_FEDERATOR_PUBLIC_KEY, bridge::getPendingFederatorPublicKey);
+        methodExecutors.put(GET_RETIRING_FEDERATION_ADDRESS, bridge::getRetiringFederationAddress);
+        methodExecutors.put(GET_RETIRING_FEDERATION_CREATION_BLOCK_NUMBER, bridge::getRetiringFederationCreationBlockNumber);
+        methodExecutors.put(GET_RETIRING_FEDERATION_CREATION_TIME, bridge::getRetiringFederationCreationTime);
+        methodExecutors.put(GET_RETIRING_FEDERATION_SIZE, bridge::getRetiringFederationSize);
+        methodExecutors.put(GET_RETIRING_FEDERATION_THRESHOLD, bridge::getRetiringFederationThreshold);
+        methodExecutors.put(GET_RETIRING_FEDERATOR_PUBLIC_KEY, bridge::getRetiringFederatorPublicKey);
+        methodExecutors.put(GET_STATE_FOR_BTC_RELEASE_CLIENT, bridge::getStateForBtcReleaseClient);
+        methodExecutors.put(GET_STATE_FOR_DEBUGGING, bridge::getStateForDebugging);
+        methodExecutors.put(IS_BTC_TX_HASH_ALREADY_PROCESSED, bridge::isBtcTxHashAlreadyProcessed);
+        methodExecutors.put(RECEIVE_HEADERS, bridge::receiveHeaders);
+        methodExecutors.put(REGISTER_BTC_TRANSACTION, bridge::registerBtcTransaction);
+        methodExecutors.put(RELEASE_BTC, bridge::releaseBtc);
+        methodExecutors.put(REMOVE_LOCK_WHITELIST_ADDRESS, bridge::removeLockWhitelistAddress);
+        methodExecutors.put(ROLLBACK_FEDERATION, bridge::rollbackFederation);
+        methodExecutors.put(SET_LOCK_WHITELIST_DISABLE_BLOCK_DELAY, bridge::setLockWhitelistDisableBlockDelay);
+        methodExecutors.put(UPDATE_COLLECTIONS, bridge::updateCollections);
+        methodExecutors.put(VOTE_FEE_PER_KB, bridge::voteFeePerKbChange);
+        return methodExecutors;
+    }
+
     private static Map<CallTransaction.Function, Long> getCosts() {
         Map<CallTransaction.Function, Long> costs = new HashMap<>();
         costs.put(ADD_FEDERATOR_PUBLIC_KEY, 13000L);
@@ -800,5 +836,9 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
 
     private static Map<ByteArrayWrapper, CallTransaction.Function> getEncodedSignatures() {
         return functionCosts.keySet().stream().collect(Collectors.toMap(func -> new ByteArrayWrapper(func.encodeSignature()), Function.identity()));
+    }
+
+    private interface BridgeMethodExecutor {
+        Optional<?> execute(Object[] args) throws Exception;
     }
 }

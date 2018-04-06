@@ -46,8 +46,8 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Precompiled contract that manages the 2 way peg between bitcoin and RSK.
@@ -60,96 +60,96 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
     private static final PanicProcessor panicProcessor = new PanicProcessor();
 
     // No parameters
-    public static final CallTransaction.Function UPDATE_COLLECTIONS = CallTransaction.Function.fromSignature("updateCollections", new String[]{}, new String[]{});
+    public static final CallTransaction.Function UPDATE_COLLECTIONS = BridgeMethods.UPDATE_COLLECTIONS.getFunction();
     // Parameters: an array of bitcoin blocks serialized with the bitcoin wire protocol format
-    public static final CallTransaction.Function RECEIVE_HEADERS = CallTransaction.Function.fromSignature("receiveHeaders", new String[]{"bytes[]"}, new String[]{});
+    public static final CallTransaction.Function RECEIVE_HEADERS = BridgeMethods.RECEIVE_HEADERS.getFunction();
     // Parameters:
     // - A bitcoin tx, serialized with the bitcoin wire protocol format
     // - The bitcoin block height that contains the tx
     // - A merkle tree that shows the tx is included in that block, serialized with the bitcoin wire protocol format.
-    public static final CallTransaction.Function REGISTER_BTC_TRANSACTION = CallTransaction.Function.fromSignature("registerBtcTransaction", new String[]{"bytes", "int", "bytes"}, new String[]{});
+    public static final CallTransaction.Function REGISTER_BTC_TRANSACTION = BridgeMethods.REGISTER_BTC_TRANSACTION.getFunction();
     // No parameters, the current rsk tx is used as input.
-    public static final CallTransaction.Function RELEASE_BTC = CallTransaction.Function.fromSignature("releaseBtc", new String[]{}, new String[]{});
+    public static final CallTransaction.Function RELEASE_BTC = BridgeMethods.RELEASE_BTC.getFunction();
     // Parameters:
     // Federator public key.
     // Transaction signature array, one for each btc tx input.
     // Rsk tx hash of the tx that required the release of funds.
-    public static final CallTransaction.Function ADD_SIGNATURE = CallTransaction.Function.fromSignature("addSignature", new String[]{"bytes","bytes[]","bytes"}, new String[]{});
+    public static final CallTransaction.Function ADD_SIGNATURE = BridgeMethods.ADD_SIGNATURE.getFunction();
     // Returns a StateForFederator encoded in RLP
-    public static final CallTransaction.Function GET_STATE_FOR_BTC_RELEASE_CLIENT = CallTransaction.Function.fromSignature("getStateForBtcReleaseClient", new String[]{}, new String[]{"bytes"});
+    public static final CallTransaction.Function GET_STATE_FOR_BTC_RELEASE_CLIENT = BridgeMethods.GET_STATE_FOR_BTC_RELEASE_CLIENT.getFunction();
     // Returns a BridgeState encoded in RLP
-    public static final CallTransaction.Function GET_STATE_FOR_DEBUGGING = CallTransaction.Function.fromSignature("getStateForDebugging", new String[]{}, new String[]{"bytes"});
+    public static final CallTransaction.Function GET_STATE_FOR_DEBUGGING = BridgeMethods.GET_STATE_FOR_DEBUGGING.getFunction();
     // Return the bitcoin blockchain best chain height know by the bridge contract
-    public static final CallTransaction.Function GET_BTC_BLOCKCHAIN_BEST_CHAIN_HEIGHT = CallTransaction.Function.fromSignature("getBtcBlockchainBestChainHeight", new String[]{}, new String[]{"int"});
+    public static final CallTransaction.Function GET_BTC_BLOCKCHAIN_BEST_CHAIN_HEIGHT = BridgeMethods.GET_BTC_BLOCKCHAIN_BEST_CHAIN_HEIGHT.getFunction();
     // Returns an array of block hashes known by the bridge contract. Federators can use this to find what is the latest block in the mainchain the bridge has.
     // The goal of this function is to help synchronize bridge and federators blockchains.
     // Protocol inspired by bitcoin sync protocol, see block locator in https://en.bitcoin.it/wiki/Protocol_documentation#getheaders
-    public static final CallTransaction.Function GET_BTC_BLOCKCHAIN_BLOCK_LOCATOR = CallTransaction.Function.fromSignature("getBtcBlockchainBlockLocator", new String[]{}, new String[]{"string[]"});
+    public static final CallTransaction.Function GET_BTC_BLOCKCHAIN_BLOCK_LOCATOR = BridgeMethods.GET_BTC_BLOCKCHAIN_BLOCK_LOCATOR.getFunction();
     // Returns the minimum amount of satoshis a user should send to the federation.
-    public static final CallTransaction.Function GET_MINIMUM_LOCK_TX_VALUE = CallTransaction.Function.fromSignature("getMinimumLockTxValue", new String[]{}, new String[]{"int"});
+    public static final CallTransaction.Function GET_MINIMUM_LOCK_TX_VALUE = BridgeMethods.GET_MINIMUM_LOCK_TX_VALUE.getFunction();
 
     // Returns whether a given btc tx hash was already processed by the bridge
-    public static final CallTransaction.Function IS_BTC_TX_HASH_ALREADY_PROCESSED = CallTransaction.Function.fromSignature("isBtcTxHashAlreadyProcessed", new String[]{"string"}, new String[]{"bool"});
+    public static final CallTransaction.Function IS_BTC_TX_HASH_ALREADY_PROCESSED = BridgeMethods.IS_BTC_TX_HASH_ALREADY_PROCESSED.getFunction();
     // Returns whether a given btc tx hash was already processed by the bridge
-    public static final CallTransaction.Function GET_BTC_TX_HASH_PROCESSED_HEIGHT = CallTransaction.Function.fromSignature("getBtcTxHashProcessedHeight", new String[]{"string"}, new String[]{"int64"});
+    public static final CallTransaction.Function GET_BTC_TX_HASH_PROCESSED_HEIGHT = BridgeMethods.GET_BTC_TX_HASH_PROCESSED_HEIGHT.getFunction();
 
     // Returns the federation bitcoin address
-    public static final CallTransaction.Function GET_FEDERATION_ADDRESS = CallTransaction.Function.fromSignature("getFederationAddress", new String[]{}, new String[]{"string"});
+    public static final CallTransaction.Function GET_FEDERATION_ADDRESS = BridgeMethods.GET_FEDERATION_ADDRESS.getFunction();
     // Returns the number of federates in the currently active federation
-    public static final CallTransaction.Function GET_FEDERATION_SIZE = CallTransaction.Function.fromSignature("getFederationSize", new String[]{}, new String[]{"int256"});
+    public static final CallTransaction.Function GET_FEDERATION_SIZE = BridgeMethods.GET_FEDERATION_SIZE.getFunction();
     // Returns the number of minimum required signatures from the currently active federation
-    public static final CallTransaction.Function GET_FEDERATION_THRESHOLD = CallTransaction.Function.fromSignature("getFederationThreshold", new String[]{}, new String[]{"int256"});
+    public static final CallTransaction.Function GET_FEDERATION_THRESHOLD = BridgeMethods.GET_FEDERATION_THRESHOLD.getFunction();
     // Returns the public key of the federator at the specified index
-    public static final CallTransaction.Function GET_FEDERATOR_PUBLIC_KEY = CallTransaction.Function.fromSignature("getFederatorPublicKey", new String[]{"int256"}, new String[]{"bytes"});
+    public static final CallTransaction.Function GET_FEDERATOR_PUBLIC_KEY = BridgeMethods.GET_FEDERATOR_PUBLIC_KEY.getFunction();
     // Returns the creation time of the federation
-    public static final CallTransaction.Function GET_FEDERATION_CREATION_TIME = CallTransaction.Function.fromSignature("getFederationCreationTime", new String[]{}, new String[]{"int256"});
+    public static final CallTransaction.Function GET_FEDERATION_CREATION_TIME = BridgeMethods.GET_FEDERATION_CREATION_TIME.getFunction();
     // Returns the block number of the creation of the federation
-    public static final CallTransaction.Function GET_FEDERATION_CREATION_BLOCK_NUMBER = CallTransaction.Function.fromSignature("getFederationCreationBlockNumber", new String[]{}, new String[]{"int256"});
+    public static final CallTransaction.Function GET_FEDERATION_CREATION_BLOCK_NUMBER = BridgeMethods.GET_FEDERATION_CREATION_BLOCK_NUMBER.getFunction();
 
     // Returns the retiring federation bitcoin address
-    public static final CallTransaction.Function GET_RETIRING_FEDERATION_ADDRESS = CallTransaction.Function.fromSignature("getRetiringFederationAddress", new String[]{}, new String[]{"string"});
+    public static final CallTransaction.Function GET_RETIRING_FEDERATION_ADDRESS = BridgeMethods.GET_RETIRING_FEDERATION_ADDRESS.getFunction();
     // Returns the number of federates in the retiring federation
-    public static final CallTransaction.Function GET_RETIRING_FEDERATION_SIZE = CallTransaction.Function.fromSignature("getRetiringFederationSize", new String[]{}, new String[]{"int256"});
+    public static final CallTransaction.Function GET_RETIRING_FEDERATION_SIZE = BridgeMethods.GET_RETIRING_FEDERATION_SIZE.getFunction();
     // Returns the number of minimum required signatures from the retiring federation
-    public static final CallTransaction.Function GET_RETIRING_FEDERATION_THRESHOLD = CallTransaction.Function.fromSignature("getRetiringFederationThreshold", new String[]{}, new String[]{"int256"});
+    public static final CallTransaction.Function GET_RETIRING_FEDERATION_THRESHOLD = BridgeMethods.GET_RETIRING_FEDERATION_THRESHOLD.getFunction();
     // Returns the public key of the retiring federation's federator at the specified index
-    public static final CallTransaction.Function GET_RETIRING_FEDERATOR_PUBLIC_KEY = CallTransaction.Function.fromSignature("getRetiringFederatorPublicKey", new String[]{"int256"}, new String[]{"bytes"});
+    public static final CallTransaction.Function GET_RETIRING_FEDERATOR_PUBLIC_KEY = BridgeMethods.GET_RETIRING_FEDERATOR_PUBLIC_KEY.getFunction();
     // Returns the creation time of the retiring federation
-    public static final CallTransaction.Function GET_RETIRING_FEDERATION_CREATION_TIME = CallTransaction.Function.fromSignature("getRetiringFederationCreationTime", new String[]{}, new String[]{"int256"});
+    public static final CallTransaction.Function GET_RETIRING_FEDERATION_CREATION_TIME = BridgeMethods.GET_RETIRING_FEDERATION_CREATION_TIME.getFunction();
     // Returns the block number of the creation of the retiring federation
-    public static final CallTransaction.Function GET_RETIRING_FEDERATION_CREATION_BLOCK_NUMBER = CallTransaction.Function.fromSignature("getRetiringFederationCreationBlockNumber", new String[]{}, new String[]{"int256"});
+    public static final CallTransaction.Function GET_RETIRING_FEDERATION_CREATION_BLOCK_NUMBER = BridgeMethods.GET_RETIRING_FEDERATION_CREATION_BLOCK_NUMBER.getFunction();
 
     // Creates a new pending federation and returns its id
-    public static final CallTransaction.Function CREATE_FEDERATION = CallTransaction.Function.fromSignature("createFederation", new String[]{}, new String[]{"int256"});
+    public static final CallTransaction.Function CREATE_FEDERATION = BridgeMethods.CREATE_FEDERATION.getFunction();
     // Adds the given key to the current pending federation
-    public static final CallTransaction.Function ADD_FEDERATOR_PUBLIC_KEY = CallTransaction.Function.fromSignature("addFederatorPublicKey", new String[]{"bytes"}, new String[]{"int256"});
+    public static final CallTransaction.Function ADD_FEDERATOR_PUBLIC_KEY = BridgeMethods.ADD_FEDERATOR_PUBLIC_KEY.getFunction();
     // Commits the currently pending federation
-    public static final CallTransaction.Function COMMIT_FEDERATION = CallTransaction.Function.fromSignature("commitFederation", new String[]{"bytes"}, new String[]{"int256"});
+    public static final CallTransaction.Function COMMIT_FEDERATION = BridgeMethods.COMMIT_FEDERATION.getFunction();
     // Rolls back the currently pending federation
-    public static final CallTransaction.Function ROLLBACK_FEDERATION = CallTransaction.Function.fromSignature("rollbackFederation", new String[]{}, new String[]{"int256"});
+    public static final CallTransaction.Function ROLLBACK_FEDERATION = BridgeMethods.ROLLBACK_FEDERATION.getFunction();
 
     // Returns the current pending federation's hash
-    public static final CallTransaction.Function GET_PENDING_FEDERATION_HASH = CallTransaction.Function.fromSignature("getPendingFederationHash", new String[]{}, new String[]{"bytes"});
+    public static final CallTransaction.Function GET_PENDING_FEDERATION_HASH = BridgeMethods.GET_PENDING_FEDERATION_HASH.getFunction();
     // Returns the number of federates in the current pending federation
-    public static final CallTransaction.Function GET_PENDING_FEDERATION_SIZE = CallTransaction.Function.fromSignature("getPendingFederationSize", new String[]{}, new String[]{"int256"});
+    public static final CallTransaction.Function GET_PENDING_FEDERATION_SIZE = BridgeMethods.GET_PENDING_FEDERATION_SIZE.getFunction();
     // Returns the public key of the federator at the specified index for the current pending federation
-    public static final CallTransaction.Function GET_PENDING_FEDERATOR_PUBLIC_KEY = CallTransaction.Function.fromSignature("getPendingFederatorPublicKey", new String[]{"int256"}, new String[]{"bytes"});
+    public static final CallTransaction.Function GET_PENDING_FEDERATOR_PUBLIC_KEY = BridgeMethods.GET_PENDING_FEDERATOR_PUBLIC_KEY.getFunction();
 
     // Returns the lock whitelist size
-    public static final CallTransaction.Function GET_LOCK_WHITELIST_SIZE = CallTransaction.Function.fromSignature("getLockWhitelistSize", new String[]{}, new String[]{"int256"});
+    public static final CallTransaction.Function GET_LOCK_WHITELIST_SIZE = BridgeMethods.GET_LOCK_WHITELIST_SIZE.getFunction();
     // Returns the lock whitelist address stored at the specified index
-    public static final CallTransaction.Function GET_LOCK_WHITELIST_ADDRESS = CallTransaction.Function.fromSignature("getLockWhitelistAddress", new String[]{"int256"}, new String[]{"string"});
+    public static final CallTransaction.Function GET_LOCK_WHITELIST_ADDRESS = BridgeMethods.GET_LOCK_WHITELIST_ADDRESS.getFunction();
     // Adds the given address to the lock whitelist
-    public static final CallTransaction.Function ADD_LOCK_WHITELIST_ADDRESS = CallTransaction.Function.fromSignature("addLockWhitelistAddress", new String[]{"string", "int256"}, new String[]{"int256"});
+    public static final CallTransaction.Function ADD_LOCK_WHITELIST_ADDRESS = BridgeMethods.ADD_LOCK_WHITELIST_ADDRESS.getFunction();
     // Adds the given address to the lock whitelist
-    public static final CallTransaction.Function REMOVE_LOCK_WHITELIST_ADDRESS = CallTransaction.Function.fromSignature("removeLockWhitelistAddress", new String[]{"string"}, new String[]{"int256"});
+    public static final CallTransaction.Function REMOVE_LOCK_WHITELIST_ADDRESS = BridgeMethods.REMOVE_LOCK_WHITELIST_ADDRESS.getFunction();
 
-    public static final CallTransaction.Function SET_LOCK_WHITELIST_DISABLE_BLOCK_DELAY = CallTransaction.Function.fromSignature("setLockWhitelistDisableBlockDelay", new String[]{"int256"}, new String[]{"int256"});
+    public static final CallTransaction.Function SET_LOCK_WHITELIST_DISABLE_BLOCK_DELAY = BridgeMethods.SET_LOCK_WHITELIST_DISABLE_BLOCK_DELAY.getFunction();
 
     // Returns the current fee per kb
-    public static final CallTransaction.Function GET_FEE_PER_KB = CallTransaction.Function.fromSignature("getFeePerKb", new String[]{}, new String[]{"int256"});
+    public static final CallTransaction.Function GET_FEE_PER_KB = BridgeMethods.GET_FEE_PER_KB.getFunction();
     // Adds the given key to the current pending federation
-    public static final CallTransaction.Function VOTE_FEE_PER_KB = CallTransaction.Function.fromSignature("voteFeePerKbChange", new String[]{"int256"}, new String[]{"int256"});
+    public static final CallTransaction.Function VOTE_FEE_PER_KB = BridgeMethods.VOTE_FEE_PER_KB.getFunction();
 
     // Log topics used by Bridge Contract
     public static final DataWord RELEASE_BTC_TOPIC = new DataWord("release_btc_topic".getBytes(StandardCharsets.UTF_8));
@@ -157,10 +157,10 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
     public static final DataWord ADD_SIGNATURE_TOPIC = new DataWord("add_signature_topic".getBytes(StandardCharsets.UTF_8));
     public static final DataWord COMMIT_FEDERATION_TOPIC = new DataWord("commit_federation_topic".getBytes(StandardCharsets.UTF_8));
 
-    private static Map<CallTransaction.Function, Long> functionCosts = getCosts();
-    private static Map<ByteArrayWrapper, CallTransaction.Function> functionSignatures = getEncodedSignatures();
+    private static final Map<CallTransaction.Function, Long> functionCosts = getCosts();
+    private static final Map<ByteArrayWrapper, CallTransaction.Function> functionSignatures = getEncodedSignatures();
+    private static final Map<CallTransaction.Function, BridgeMethods.BridgeMethodExecutor> methodExecutors = getMethodExecutors();
 
-    private final Map<CallTransaction.Function, BridgeMethodExecutor> methodExecutors;
     private final RskSystemProperties config;
     private final BridgeConstants bridgeConstants;
 
@@ -175,7 +175,6 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
         this.config = config;
         this.bridgeConstants = this.config.getBlockchainConfig().getCommonConstants().getBridgeConstants();
         this.contractAddress = contractAddress;
-        this.methodExecutors = getMethodExecutors(this);
     }
 
     @Override
@@ -265,7 +264,7 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
             try {
                 // bridgeParsedData.function should be one of the CallTransaction.Function declared above.
                 // If the user tries to call an non-existent function, parseData() will return null.
-                result = methodExecutors.get(bridgeParsedData.function).execute(bridgeParsedData.args);
+                result = methodExecutors.get(bridgeParsedData.function).execute(this, bridgeParsedData.args);
             } catch (BridgeIllegalArgumentException ex) {
                 logger.warn("Error executing: {}", bridgeParsedData.function.name, ex);
                 return null;
@@ -748,97 +747,22 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
         return Optional.of(bridgeSupport.getFeePerKb().getValue());
     }
 
-    private static Map<CallTransaction.Function, BridgeMethodExecutor> getMethodExecutors(Bridge bridge) {
-        Map<CallTransaction.Function, BridgeMethodExecutor> methodExecutors = new HashMap<>();
-        methodExecutors.put(ADD_FEDERATOR_PUBLIC_KEY, bridge::addFederatorPublicKey);
-        methodExecutors.put(ADD_LOCK_WHITELIST_ADDRESS, bridge::addLockWhitelistAddress);
-        methodExecutors.put(ADD_SIGNATURE, bridge::addSignature);
-        methodExecutors.put(COMMIT_FEDERATION, bridge::commitFederation);
-        methodExecutors.put(CREATE_FEDERATION, bridge::createFederation);
-        methodExecutors.put(GET_BTC_BLOCKCHAIN_BEST_CHAIN_HEIGHT, bridge::getBtcBlockchainBestChainHeight);
-        methodExecutors.put(GET_BTC_BLOCKCHAIN_BLOCK_LOCATOR, bridge::getBtcBlockchainBlockLocator);
-        methodExecutors.put(GET_BTC_TX_HASH_PROCESSED_HEIGHT, bridge::getBtcTxHashProcessedHeight);
-        methodExecutors.put(GET_FEDERATION_ADDRESS, bridge::getFederationAddress);
-        methodExecutors.put(GET_FEDERATION_CREATION_BLOCK_NUMBER, bridge::getFederationCreationBlockNumber);
-        methodExecutors.put(GET_FEDERATION_CREATION_TIME, bridge::getFederationCreationTime);
-        methodExecutors.put(GET_FEDERATION_SIZE, bridge::getFederationSize);
-        methodExecutors.put(GET_FEDERATION_THRESHOLD, bridge::getFederationThreshold);
-        methodExecutors.put(GET_FEDERATOR_PUBLIC_KEY, bridge::getFederatorPublicKey);
-        methodExecutors.put(GET_FEE_PER_KB, bridge::getFeePerKb);
-        methodExecutors.put(GET_LOCK_WHITELIST_ADDRESS, bridge::getLockWhitelistAddress);
-        methodExecutors.put(GET_LOCK_WHITELIST_SIZE, bridge::getLockWhitelistSize);
-        methodExecutors.put(GET_MINIMUM_LOCK_TX_VALUE, bridge::getMinimumLockTxValue);
-        methodExecutors.put(GET_PENDING_FEDERATION_HASH, bridge::getPendingFederationHash);
-        methodExecutors.put(GET_PENDING_FEDERATION_SIZE, bridge::getPendingFederationSize);
-        methodExecutors.put(GET_PENDING_FEDERATOR_PUBLIC_KEY, bridge::getPendingFederatorPublicKey);
-        methodExecutors.put(GET_RETIRING_FEDERATION_ADDRESS, bridge::getRetiringFederationAddress);
-        methodExecutors.put(GET_RETIRING_FEDERATION_CREATION_BLOCK_NUMBER, bridge::getRetiringFederationCreationBlockNumber);
-        methodExecutors.put(GET_RETIRING_FEDERATION_CREATION_TIME, bridge::getRetiringFederationCreationTime);
-        methodExecutors.put(GET_RETIRING_FEDERATION_SIZE, bridge::getRetiringFederationSize);
-        methodExecutors.put(GET_RETIRING_FEDERATION_THRESHOLD, bridge::getRetiringFederationThreshold);
-        methodExecutors.put(GET_RETIRING_FEDERATOR_PUBLIC_KEY, bridge::getRetiringFederatorPublicKey);
-        methodExecutors.put(GET_STATE_FOR_BTC_RELEASE_CLIENT, bridge::getStateForBtcReleaseClient);
-        methodExecutors.put(GET_STATE_FOR_DEBUGGING, bridge::getStateForDebugging);
-        methodExecutors.put(IS_BTC_TX_HASH_ALREADY_PROCESSED, bridge::isBtcTxHashAlreadyProcessed);
-        methodExecutors.put(RECEIVE_HEADERS, bridge::receiveHeaders);
-        methodExecutors.put(REGISTER_BTC_TRANSACTION, bridge::registerBtcTransaction);
-        methodExecutors.put(RELEASE_BTC, bridge::releaseBtc);
-        methodExecutors.put(REMOVE_LOCK_WHITELIST_ADDRESS, bridge::removeLockWhitelistAddress);
-        methodExecutors.put(ROLLBACK_FEDERATION, bridge::rollbackFederation);
-        methodExecutors.put(SET_LOCK_WHITELIST_DISABLE_BLOCK_DELAY, bridge::setLockWhitelistDisableBlockDelay);
-        methodExecutors.put(UPDATE_COLLECTIONS, bridge::updateCollections);
-        methodExecutors.put(VOTE_FEE_PER_KB, bridge::voteFeePerKbChange);
-        return methodExecutors;
+    private static Map<CallTransaction.Function, BridgeMethods.BridgeMethodExecutor> getMethodExecutors() {
+        return Stream.of(BridgeMethods.values())
+                .collect(Collectors.toMap(BridgeMethods::getFunction, BridgeMethods::getExecutor));
     }
 
     private static Map<CallTransaction.Function, Long> getCosts() {
-        Map<CallTransaction.Function, Long> costs = new HashMap<>();
-        costs.put(ADD_FEDERATOR_PUBLIC_KEY, 13000L);
-        costs.put(ADD_LOCK_WHITELIST_ADDRESS, 25000L);
-        costs.put(ADD_SIGNATURE, 70000L);
-        costs.put(COMMIT_FEDERATION, 38000L);
-        costs.put(CREATE_FEDERATION, 11000L);
-        costs.put(GET_BTC_BLOCKCHAIN_BEST_CHAIN_HEIGHT, 19000L);
-        costs.put(GET_BTC_BLOCKCHAIN_BLOCK_LOCATOR, 76000L);
-        costs.put(GET_BTC_TX_HASH_PROCESSED_HEIGHT, 22000L);
-        costs.put(GET_FEDERATION_ADDRESS, 11000L);
-        costs.put(GET_FEDERATION_CREATION_BLOCK_NUMBER, 10000L);
-        costs.put(GET_FEDERATION_CREATION_TIME, 10000L);
-        costs.put(GET_FEDERATION_SIZE, 10000L);
-        costs.put(GET_FEDERATION_THRESHOLD, 11000L);
-        costs.put(GET_FEDERATOR_PUBLIC_KEY, 10000L);
-        costs.put(GET_FEE_PER_KB, 2000L);
-        costs.put(GET_LOCK_WHITELIST_ADDRESS, 16000L);
-        costs.put(GET_LOCK_WHITELIST_SIZE, 16000L);
-        costs.put(GET_MINIMUM_LOCK_TX_VALUE, 2000L);
-        costs.put(GET_PENDING_FEDERATION_HASH, 3000L);
-        costs.put(GET_PENDING_FEDERATION_SIZE, 3000L);
-        costs.put(GET_PENDING_FEDERATOR_PUBLIC_KEY, 3000L);
-        costs.put(GET_RETIRING_FEDERATION_ADDRESS, 3000L);
-        costs.put(GET_RETIRING_FEDERATION_CREATION_BLOCK_NUMBER, 3000L);
-        costs.put(GET_RETIRING_FEDERATION_CREATION_TIME, 3000L);
-        costs.put(GET_RETIRING_FEDERATION_SIZE, 3000L);
-        costs.put(GET_RETIRING_FEDERATION_THRESHOLD, 3000L);
-        costs.put(GET_RETIRING_FEDERATOR_PUBLIC_KEY, 3000L);
-        costs.put(GET_STATE_FOR_BTC_RELEASE_CLIENT, 4000L);
-        costs.put(GET_STATE_FOR_DEBUGGING, 3_000_000L);
-        costs.put(IS_BTC_TX_HASH_ALREADY_PROCESSED, 23000L);
-        costs.put(RECEIVE_HEADERS, 22000L);
-        costs.put(REGISTER_BTC_TRANSACTION, 22000L);
-        costs.put(RELEASE_BTC, 23000L);
-        costs.put(REMOVE_LOCK_WHITELIST_ADDRESS, 24000L);
-        costs.put(ROLLBACK_FEDERATION, 12000L);
-        costs.put(SET_LOCK_WHITELIST_DISABLE_BLOCK_DELAY, 24000L);
-        costs.put(UPDATE_COLLECTIONS, 48000L);
-        costs.put(VOTE_FEE_PER_KB, 10000L);
-        return costs;
+        return Stream.of(BridgeMethods.values())
+                .collect(Collectors.toMap(BridgeMethods::getFunction, BridgeMethods::getCost));
     }
 
     private static Map<ByteArrayWrapper, CallTransaction.Function> getEncodedSignatures() {
-        return functionCosts.keySet().stream().collect(Collectors.toMap(func -> new ByteArrayWrapper(func.encodeSignature()), Function.identity()));
+        return Stream.of(BridgeMethods.values())
+                .collect(Collectors.toMap(
+                        m -> new ByteArrayWrapper(m.getFunction().encodeSignature()),
+                        BridgeMethods::getFunction
+                ));
     }
 
-    private interface BridgeMethodExecutor {
-        Optional<?> execute(Object[] args) throws Exception;
-    }
 }

@@ -990,7 +990,7 @@ public class RskContext implements NodeBootstrapper {
         return difficultyCalculator;
     }
 
-    private BlockToMineBuilder getBlockToMineBuilder() {
+    public BlockToMineBuilder getBlockToMineBuilder() {
         if (blockToMineBuilder == null) {
             blockToMineBuilder = new BlockToMineBuilder(
                     getRskSystemProperties().getActivationConfig(),

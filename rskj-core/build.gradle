@@ -16,6 +16,10 @@ apply plugin: 'witness'
 apply plugin: 'maven'
 apply plugin: 'jacoco'
 
+def config = new ConfigSlurper().parse(new File("$projectDir/src/main/resources/version.properties").toURI().toURL())
+group = 'co.rsk'
+version = config.modifier?.trim() ? config.versionNumber + "-" + config.modifier : config.versionNumber
+
 test {
     beforeTest { descriptor ->
         logger.lifecycle("Running test: ${descriptor}")
@@ -28,6 +32,15 @@ test {
         exceptionFormat "short"
     }
     finalizedBy jacocoTestReport
+}
+
+// these two allow using the test classes from dsl-tests
+task testJar(type: Jar) {
+    classifier = 'test'
+    from sourceSets.test.output.classesDirs
+}
+artifacts {
+    testRuntime testJar
 }
 
 tasks.withType(Javadoc) {
